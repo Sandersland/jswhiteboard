@@ -118,6 +118,28 @@ document.addEventListener("DOMContentLoaded", function () {
   canvas.addEventListener("mouseout", () => game.cursor.pickUp());
 });
 
+class CanvasEvent {
+  constructor(type) {
+    this.type = type;
+  }
+}
+
+class DrawEvent extends CanvasEvent {
+  constructor(color, width, points) {
+    super("draw");
+    this.color = color;
+    this.width = width;
+    this.points = points;
+  }
+}
+
+class ImageEvent extends CanvasEvent {
+  constructor(image) {
+    super("image");
+    this.image = image;
+  }
+}
+
 class Game {
   constructor(canvas, socket, roomId) {
     this.roomId = roomId;
@@ -144,24 +166,33 @@ class Game {
   }
 
   paste(e) {
-    // TODO: this should be added to history somehow
     e.preventDefault();
     // get item from clipboard
     const item = e.clipboardData.items[0];
 
+    // create image html element
     const img = new Image();
+
     img.onload = () => {
+      // draw the image on the canvas
       this.context.drawImage(img, 0, 0);
+
+      // draw the image on other client's canvas
       this.update(true);
     };
 
+    // only support images
     if (item.type.indexOf("image") === 0) {
       const blob = item.getAsFile();
       const reader = new FileReader();
 
       reader.onload = (event) => {
-        img.src = event.target.result;
-        this.history.push({ type: "image", image: event.target.result });
+        const dataUrl = event.target.result;
+        // set the image source and trigger the onload event
+        img.src = dataUrl;
+
+        // add the image event to the history array
+        this.history.push(new ImageEvent(dataUrl));
       };
 
       reader.readAsDataURL(blob);
@@ -193,12 +224,9 @@ class Game {
 
     if (!data.isDown) {
       if (cursor.points.length) {
-        this.history.push({
-          type: "draw",
-          points: cursor.points,
-          color: cursor.color,
-          width: cursor.width,
-        });
+        this.history.push(
+          new DrawEvent(cursor.color, cursor.width, cursor.points)
+        );
         cursor.points = [];
       }
 
@@ -248,14 +276,9 @@ class Pen {
     if (this.isDown) {
       this.isDown = false;
       if (!this.points.length) return;
-
-      this.game.history.push({
-        type: "draw",
-        points: this.points,
-        color: this.color,
-        width: this.width,
-      });
-
+      this.game.history.push(
+        new DrawEvent(this.color, this.width, this.points)
+      );
       this.game.update();
     }
   }
