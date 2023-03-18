@@ -24,7 +24,10 @@ app.use((req, res, next) => {
     if (!roomId) {
       roomId = crypto.randomUUID();
       rooms[roomId] = {
-        history: [],
+        history: {
+          position: 0,
+          events: [],
+        },
       };
       return res.redirect(url.parse(req.url).pathname + `?roomId=${roomId}`);
     }

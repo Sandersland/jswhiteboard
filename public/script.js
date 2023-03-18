@@ -22,12 +22,12 @@ document.addEventListener("DOMContentLoaded", function () {
   // send an event to join a room when first connecting
   socket.emit("room:join", { roomId }, (data) => {
     // when we successfully join a room, get the history from the server and update the canvas
-    game.history = data.history;
+    game.history.set(data.history);
     game.fill();
   });
 
   socket.on("server:update", (data) => {
-    game.history = data.history;
+    game.history.set(data.history);
     game.fill();
   });
 
@@ -38,8 +38,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // handle a reset event
   socket.on("server:reset", () => {
-    game.history = [];
-    game.clear();
+    game.reset();
   });
 
   penWidth.addEventListener("change", (e) =>
@@ -71,6 +70,13 @@ document.addEventListener("DOMContentLoaded", function () {
   document.addEventListener("keydown", (e) => {
     if (!e.ctrlKey || e.key !== "z") return;
     game.undo();
+    game.update(true);
+  });
+
+  // handle redo using keyboard
+  document.addEventListener("keydown", (e) => {
+    if (!e.ctrlKey || e.key !== "y") return;
+    game.redo();
     game.update(true);
   });
 
@@ -108,8 +114,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // clear the screen
   clearButton.addEventListener("click", () => {
-    game.history = [];
-    game.clear();
+    game.reset();
     game.update(true);
   });
 

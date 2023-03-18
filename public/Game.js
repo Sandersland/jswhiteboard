@@ -22,6 +22,40 @@ export class ImageEvent extends CanvasEvent {
   }
 }
 
+class EventCache {
+  constructor() {
+    this.position = 0;
+    this.events = [];
+  }
+
+  set({ events, position }) {
+    this.events = events;
+    this.position = position;
+  }
+
+  add(event) {
+    if (this.position <= this.events.length) {
+      this.events = this.events.slice(0, this.position);
+    }
+
+    this.events.push(event);
+
+    this.position += 1;
+  }
+
+  undo() {
+    if (this.position > 0) {
+      this.position -= 1;
+    }
+  }
+
+  redo() {
+    if (this.position < this.events.length) {
+      this.position += 1;
+    }
+  }
+}
+
 export default class Game {
   constructor(canvas, socket, roomId) {
     this.canvas = canvas;
@@ -31,8 +65,13 @@ export default class Game {
     this.width = canvas.width;
     this.height = canvas.height;
     this.cursor = new Pen(this);
-    this.history = [];
+    this.history = new EventCache();
     this.clients = {};
+  }
+
+  reset() {
+    this.history = new EventCache();
+    this.clear();
   }
 
   // generic interface used to add events to the stack
@@ -46,7 +85,7 @@ export default class Game {
         event = new ImageEvent(data);
         break;
     }
-    this.history.push(event);
+    this.history.add(event);
   }
 
   clear() {
@@ -129,7 +168,8 @@ export default class Game {
   fill() {
     this.clear();
     // redraw everything
-    this.history.forEach((event) => {
+    this.history.events.forEach((event, i) => {
+      if (i >= this.history.position) return;
       const { type, points: paths, color, width } = event;
       if (type === "draw") {
         this.context.strokeStyle = color;
@@ -156,10 +196,13 @@ export default class Game {
     });
   }
 
-  undo(numSteps = 1) {
-    // remove the last specified strokes
-    this.history.splice(this.history.length - Math.max(0, numSteps), numSteps);
+  undo() {
+    this.history.undo();
+    this.fill();
+  }
 
+  redo() {
+    this.history.redo();
     this.fill();
   }
 }
