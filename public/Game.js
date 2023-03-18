@@ -22,6 +22,12 @@ export class ImageEvent extends CanvasEvent {
   }
 }
 
+export class ResetEvent extends CanvasEvent {
+  constructor() {
+    super("reset");
+  }
+}
+
 class EventCache {
   constructor() {
     this.position = 0;
@@ -70,7 +76,7 @@ export default class Game {
   }
 
   reset() {
-    this.history = new EventCache();
+    this.append("reset");
     this.clear();
   }
 
@@ -83,6 +89,9 @@ export default class Game {
         break;
       case "image":
         event = new ImageEvent(data);
+        break;
+      case "reset":
+        event = new ResetEvent();
         break;
     }
     this.history.add(event);
@@ -192,6 +201,8 @@ export default class Game {
         img.onload = () => {
           this.context.drawImage(img, 0, 0);
         };
+      } else if (type === "reset") {
+        this.context.clearRect(0, 0, this.width, this.height);
       }
     });
   }
