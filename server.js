@@ -17,18 +17,21 @@ const rooms = {};
 
 // make sure that the roomId parameter exists as it is what identifies the drawing session
 app.use((req, res, next) => {
-  let roomId = req.query.roomId;
+  if (req.path === "/") {
+    // only handle root path
+    let roomId = req.query.roomId;
 
-  if (!roomId) {
-    roomId = crypto.randomUUID();
-    rooms[roomId] = {
-      history: [],
-    };
-    return res.redirect(url.parse(req.url).pathname + `?roomId=${roomId}`);
-  }
+    if (!roomId) {
+      roomId = crypto.randomUUID();
+      rooms[roomId] = {
+        history: [],
+      };
+      return res.redirect(url.parse(req.url).pathname + `?roomId=${roomId}`);
+    }
 
-  if (roomId && !rooms[roomId]) {
-    return res.redirect(url.parse(req.url).pathname);
+    if (roomId && !rooms[roomId]) {
+      return res.redirect(url.parse(req.url).pathname);
+    }
   }
 
   next();
