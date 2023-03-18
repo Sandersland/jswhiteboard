@@ -35,6 +35,7 @@ export default class Game {
     this.clients = {};
   }
 
+  // generic interface used to add events to the stack
   append(type, data) {
     let event;
     switch (type) {
@@ -42,18 +43,21 @@ export default class Game {
         event = new DrawEvent(data.color, data.width, data.points);
         break;
       case "image":
-        event = new ImageEvent(data.image);
+        event = new ImageEvent(data);
         break;
     }
     this.history.push(event);
   }
 
   clear() {
+    // simply clear the entire canvas
     this.context.clearRect(0, 0, this.width, this.height);
   }
 
   copy() {
+    // get the image from the canvas
     this.canvas.toBlob((blob) => {
+      // add the image to the clipboard
       const item = new ClipboardItem({ "image/png": blob });
       navigator.clipboard.write([item]);
     });
@@ -82,7 +86,7 @@ export default class Game {
         img.src = dataUrl;
 
         // add the image event to the history array
-        this.history.push(new ImageEvent(dataUrl));
+        this.append("image", dataUrl);
       };
 
       reader.readAsDataURL(blob);
@@ -98,30 +102,28 @@ export default class Game {
   }
 
   stream(data) {
-    let cursor = this.clients[data.socketId];
+    let clientCursor = this.clients[data.socketId];
 
-    if (!cursor) {
-      cursor = this.clients[data.socketId] = new Pen(this);
+    if (!clientCursor) {
+      clientCursor = this.clients[data.socketId] = new Pen(this);
     }
 
-    cursor.setWidth(data.width);
-    cursor.setColor(data.color);
-    cursor.isDown = data.isDown;
+    clientCursor.setWidth(data.width);
+    clientCursor.setColor(data.color);
+    clientCursor.isDown = data.isDown;
 
     if (!data.isDown) {
-      if (cursor.points.length) {
-        this.history.push(
-          new DrawEvent(cursor.color, cursor.width, cursor.points)
-        );
-        cursor.points = [];
+      if (clientCursor.points.length) {
+        this.append("draw", clientCursor);
+        clientCursor.points = [];
       }
 
-      // keep track of the last cursor position
-      cursor.x = data.x;
-      cursor.y = data.y;
+      // always keep track of the last cursor position
+      clientCursor.x = data.x;
+      clientCursor.y = data.y;
       return;
     }
-    cursor.draw(data.x, data.y);
+    clientCursor.draw(data.x, data.y);
   }
 
   fill() {
