@@ -21,21 +21,21 @@ document.addEventListener("DOMContentLoaded", function () {
   socket.emit("room:join", { roomId }, (data) => {
     // when we successfully join a room, get the history from the server and update the canvas
     game.history = data.history;
-    game.cursor.fill();
+    game.fill();
   });
 
   socket.on("server:update", (data) => {
     game.history = data.history;
-    game.cursor.fill();
+    game.fill();
   });
 
   // handle drawing events from other clients
   socket.on("server:draw", (data) => game.stream(data));
 
-  socket.on("server:undo", () => game.cursor.undo());
+  socket.on("server:undo", () => game.undo());
 
   // handle a reset event
-  socket.on("server:reset", (data) => {
+  socket.on("server:reset", () => {
     game.history = [];
     game.clear();
   });
@@ -67,7 +67,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   document.addEventListener("keydown", (e) => {
     if (!e.ctrlKey || e.key !== "z") return;
-    game.cursor.undo();
+    game.undo();
     game.update(true);
   });
 
@@ -83,13 +83,16 @@ document.addEventListener("DOMContentLoaded", function () {
       canvas.width = newWidth;
       game.width = newWidth;
 
-      game.cursor.fill();
+      game.fill();
     },
     false
   );
 
   // undo the last line drawn
-  undoButton.addEventListener("click", () => game.undo());
+  undoButton.addEventListener("click", () => {
+    game.undo();
+    game.update(true);
+  });
 
   // clear the screen
   clearButton.addEventListener("click", () => {
@@ -211,11 +214,6 @@ class Game {
     }
   }
 
-  undo() {
-    this.cursor.undo();
-    this.update(true);
-  }
-
   update(force = false) {
     this.socket.emit("client:update", {
       history: this.history,
@@ -249,6 +247,43 @@ class Game {
       return;
     }
     cursor.draw(data.x, data.y);
+  }
+
+  fill() {
+    this.clear();
+    // redraw everything
+    this.history.forEach((event) => {
+      const { type, points: paths, color, width } = event;
+      if (type === "draw") {
+        this.context.strokeStyle = color;
+        this.context.lineWidth = width;
+        this.context.lineCap = this.cursor.lineCap;
+        let currentPath = paths[0];
+
+        for (let i = 1; i < paths.length; i++) {
+          this.context.beginPath();
+          this.context.moveTo(currentPath.x, currentPath.y);
+          currentPath = paths[i];
+          this.context.lineTo(currentPath.x, currentPath.y);
+          this.context.stroke();
+          this.context.closePath();
+        }
+      } else if (type === "image") {
+        const img = new Image();
+        img.src = event.image;
+
+        img.onload = () => {
+          this.context.drawImage(img, 0, 0);
+        };
+      }
+    });
+  }
+
+  undo(numSteps = 1) {
+    // remove the last specified strokes
+    this.history.splice(this.history.length - Math.max(0, numSteps), numSteps);
+
+    this.fill();
   }
 }
 
@@ -305,45 +340,5 @@ class Pen {
     this.points.push({ x: this.x, y: this.y });
     this.game.context.lineTo(this.x, this.y);
     this.game.context.stroke();
-  }
-
-  undo(numSteps = 1) {
-    // remove the last specified strokes
-    this.game.history.splice(
-      this.game.history.length - Math.max(0, numSteps),
-      numSteps
-    );
-
-    this.fill();
-  }
-
-  fill() {
-    this.game.clear();
-    // redraw everything
-    this.game.history.forEach((event) => {
-      const { type, points: paths, color, width } = event;
-      if (type === "draw") {
-        this.game.context.strokeStyle = color;
-        this.game.context.lineWidth = width;
-        this.game.context.lineCap = this.lineCap;
-        let currentPath = paths[0];
-
-        for (let i = 1; i < paths.length; i++) {
-          this.game.context.beginPath();
-          this.game.context.moveTo(currentPath.x, currentPath.y);
-          currentPath = paths[i];
-          this.game.context.lineTo(currentPath.x, currentPath.y);
-          this.game.context.stroke();
-          this.game.context.closePath();
-        }
-      } else if (type === "image") {
-        const img = new Image();
-        img.src = event.image;
-
-        img.onload = () => {
-          this.game.context.drawImage(img, 0, 0);
-        };
-      }
-    });
   }
 }
