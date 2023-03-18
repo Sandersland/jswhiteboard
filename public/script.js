@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   // handle drawing events from other clients
-  socket.on("server:draw", (data) => game.cursor.stream(data));
+  socket.on("server:draw", (data) => game.stream(data));
 
   socket.on("server:undo", () => game.cursor.undo());
 
@@ -128,6 +128,7 @@ class Game {
     this.height = canvas.height;
     this.cursor = new Pen(this);
     this.history = [];
+    this.clients = {};
   }
 
   clear() {
@@ -178,6 +179,46 @@ class Game {
       roomId: this.roomId,
       force,
     });
+  }
+
+  stream(data) {
+    let cursor = this.clients[data.socketId];
+
+    if (!cursor) {
+      cursor = this.clients[data.socketId] = new Pen(this);
+    }
+
+    cursor.width = data.width;
+    cursor.color = data.color;
+
+    if (!data.isDown) {
+      if (cursor.points.length) {
+        this.history.push({
+          type: "draw",
+          points: cursor.points,
+          color: cursor.color,
+          width: cursor.width,
+        });
+        cursor.points = [];
+      }
+
+      // keep track of the last cursor position
+      cursor.x = data.x;
+      cursor.y = data.y;
+      return;
+    }
+
+    this.context.lineCap = cursor.lineCap;
+    this.context.strokeStyle = cursor.color;
+    this.context.lineWidth = cursor.width;
+    this.context.beginPath();
+    this.context.moveTo(cursor.x, cursor.y);
+    cursor.x = data.x;
+    cursor.y = data.y;
+    cursor.points.push({ x: cursor.x, y: cursor.y });
+    this.context.lineTo(cursor.x, cursor.y);
+    this.context.stroke();
+    this.context.closePath();
   }
 }
 
@@ -242,39 +283,6 @@ class Pen {
     this.points.push({ x: this.x, y: this.y });
     this.game.context.lineTo(this.x, this.y);
     this.game.context.stroke();
-  }
-
-  stream(data) {
-    this.width = data.width;
-    this.color = data.color;
-    if (!data.isDown) {
-      if (this.points.length) {
-        this.game.history.push({
-          type: "draw",
-          points: this.points,
-          color: this.color,
-          width: this.width,
-        });
-        this.points = [];
-      }
-
-      // keep track of the last cursor position
-      this.x = data.x;
-      this.y = data.y;
-      return;
-    }
-
-    this.game.context.lineCap = this.lineCap;
-    this.game.context.strokeStyle = this.color;
-    this.game.context.lineWidth = this.width;
-    this.game.context.beginPath();
-    this.game.context.moveTo(this.x, this.y);
-    this.x = data.x;
-    this.y = data.y;
-    this.points.push({ x: this.x, y: this.y });
-    this.game.context.lineTo(this.x, this.y);
-    this.game.context.stroke();
-    this.game.context.closePath();
   }
 
   undo(numSteps = 1) {
