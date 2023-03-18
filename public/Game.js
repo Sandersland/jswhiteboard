@@ -52,19 +52,14 @@ export default class Game {
     this.context.clearRect(0, 0, this.width, this.height);
   }
 
-  copy(e) {
-    e.preventDefault();
+  copy() {
     this.canvas.toBlob((blob) => {
       const item = new ClipboardItem({ "image/png": blob });
       navigator.clipboard.write([item]);
     });
   }
 
-  paste(e) {
-    e.preventDefault();
-    // get item from clipboard
-    const item = e.clipboardData.items[0];
-
+  paste(item) {
     // create image html element
     const img = new Image();
 

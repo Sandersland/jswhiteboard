@@ -67,15 +67,25 @@ document.addEventListener("DOMContentLoaded", function () {
     document.body.removeChild(a);
   });
 
+  // handle undo using keyboard
   document.addEventListener("keydown", (e) => {
     if (!e.ctrlKey || e.key !== "z") return;
     game.undo();
     game.update(true);
   });
 
-  document.addEventListener("copy", (e) => game.copy(e));
+  // override default copy
+  document.addEventListener("copy", (e) => {
+    e.preventDefault();
+    game.copy();
+  });
 
-  document.addEventListener("paste", (e) => game.paste(e));
+  // override default paste
+  document.addEventListener("paste", (e) => {
+    e.preventDefault();
+    const item = e.clipboardData.items[0];
+    game.paste(item);
+  });
 
   // handle resizing the canvas
   window.addEventListener(
