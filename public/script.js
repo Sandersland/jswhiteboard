@@ -16,8 +16,16 @@ document.addEventListener("DOMContentLoaded", function () {
   let roomId = new URL(window.location.href).searchParams.get("roomId");
 
   const game = new Game(canvas, socket, roomId);
-  game.cursor.setWidth(penWidth.value);
-  game.cursor.setColor(penColor.value);
+
+  // set the initial cursor color
+  const color = localStorage.getItem("color") || penColor.value;
+  game.cursor.setColor(color);
+  penColor.value = color;
+
+  // set the initial cursor width
+  const width = localStorage.getItem("width") || penWidth.value;
+  game.cursor.setWidth(width);
+  penWidth.value = width;
 
   // send an event to join a room when first connecting
   socket.emit("room:join", { roomId }, (data) => {
@@ -41,13 +49,15 @@ document.addEventListener("DOMContentLoaded", function () {
     game.reset();
   });
 
-  penWidth.addEventListener("change", (e) =>
-    game.cursor.setWidth(e.target.value)
-  );
+  penWidth.addEventListener("change", (e) => {
+    localStorage.setItem("width", e.target.value);
+    game.cursor.setWidth(e.target.value);
+  });
 
-  penColor.addEventListener("change", (e) =>
-    game.cursor.setColor(e.target.value)
-  );
+  penColor.addEventListener("change", (e) => {
+    localStorage.setItem("color", e.target.value);
+    game.cursor.setColor(e.target.value);
+  });
 
   // download and image of the drawing in it's current state when this is clicked
   downloadButton.addEventListener("click", function (e) {
