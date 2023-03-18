@@ -99,11 +99,23 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   canvas.addEventListener("mousedown", (e) => {
-    game.cursor.putDown(e.offsetX, e.offsetY);
+    // account for the canvas offsets
+    const x = e.offsetX - game.canvas.offsetLeft;
+    const y = e.offsetY - game.canvas.offsetTop;
+
+    // update cursor
+    game.cursor.putDown(x, y);
   });
 
   canvas.addEventListener("mousemove", (e) => {
-    game.cursor.draw(e.offsetX, e.offsetY);
+    // account for the canvas offsets
+    const x = e.offsetX - game.canvas.offsetLeft;
+    const y = e.offsetY - game.canvas.offsetTop;
+
+    // draw on the canvas
+    game.cursor.draw(x, y);
+
+    // update other clients
     socket.emit("client:draw", {
       x: e.offsetX,
       y: e.offsetY,
@@ -219,8 +231,9 @@ class Game {
       cursor = this.clients[data.socketId] = new Pen(this);
     }
 
-    cursor.width = data.width;
-    cursor.color = data.color;
+    cursor.setWidth(data.width);
+    cursor.setColor(data.color);
+    cursor.isDown = data.isDown;
 
     if (!data.isDown) {
       if (cursor.points.length) {
@@ -235,25 +248,14 @@ class Game {
       cursor.y = data.y;
       return;
     }
-
-    this.context.lineCap = cursor.lineCap;
-    this.context.strokeStyle = cursor.color;
-    this.context.lineWidth = cursor.width;
-    this.context.beginPath();
-    this.context.moveTo(cursor.x, cursor.y);
-    cursor.x = data.x;
-    cursor.y = data.y;
-    cursor.points.push({ x: cursor.x, y: cursor.y });
-    this.context.lineTo(cursor.x, cursor.y);
-    this.context.stroke();
-    this.context.closePath();
+    cursor.draw(data.x, data.y);
   }
 }
 
 class Pen {
-  constructor(game, socketId = null) {
+  constructor(game) {
+    // keep track of game object to append events onto the history array
     this.game = game;
-    this.socketId = socketId;
     // default values
     this.x = 0;
     this.y = 0;
@@ -285,14 +287,10 @@ class Pen {
 
   putDown(x, y) {
     this.points = [];
-    this.getPosition(x, y);
+    this.x = x;
+    this.y = y;
     this.points.push({ x: this.x, y: this.y });
     this.isDown = true;
-  }
-
-  getPosition(x, y) {
-    this.x = x - this.game.canvas.offsetLeft;
-    this.y = y - this.game.canvas.offsetTop;
   }
 
   draw(x, y) {
@@ -302,7 +300,8 @@ class Pen {
     this.game.context.lineWidth = this.width;
     this.game.context.beginPath();
     this.game.context.moveTo(this.x, this.y);
-    this.getPosition(x, y);
+    this.x = x;
+    this.y = y;
     this.points.push({ x: this.x, y: this.y });
     this.game.context.lineTo(this.x, this.y);
     this.game.context.stroke();
