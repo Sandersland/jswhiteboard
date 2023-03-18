@@ -48,26 +48,18 @@ io.on("connection", (socket) => {
     callback({ history });
   });
 
-  socket.on("history:update", (data) => {
-    rooms[data.roomId].history = data.history;
-  });
+  socket.on("client:update", (data) => {
+    const currentRoom = rooms[data.roomId];
+    if (!currentRoom) return; // don't crash the server
 
-  socket.on("client:reset", (data) => {
-    rooms[data.roomId].history = [];
-    socket.to(data.roomId).emit("server:reset", { id: socket.id });
+    currentRoom.history = data.history;
+
+    if (!data.force) return;
+    socket.to(data.roomId).emit("server:update", data);
   });
 
   socket.on("client:draw", (data) => {
-    socket.to(data.roomId).emit("server:draw", { id: socket.id, ...data });
-  });
-
-  socket.on("client:undo", (data) => {
-    const room = rooms[data.roomId];
-    room.history.splice(
-      room.history.length - Math.max(0, data.steps),
-      data.steps
-    );
-    socket.to(data.roomId).emit("server:undo", { id: socket.id });
+    socket.to(data.roomId).emit("server:draw", data);
   });
 });
 

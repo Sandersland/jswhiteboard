@@ -5,9 +5,9 @@ document.addEventListener("DOMContentLoaded", function () {
   canvas.width = window.innerWidth - CANVAS_MARGIN;
   const penColor = document.querySelector('input[name="penColor"]');
   const penWidth = document.querySelector('input[name="penWidth"]');
-  const saveButton = document.getElementById("saver");
+  const downloadButton = document.getElementById("download");
   const undoButton = document.getElementById("undo");
-  const clearButton = document.getElementById("clear");
+  const clearButton = document.getElementById("reset");
 
   const socket = io();
 
@@ -24,33 +24,18 @@ document.addEventListener("DOMContentLoaded", function () {
     game.cursor.fill();
   });
 
+  socket.on("server:update", (data) => {
+    game.history = data.history;
+    game.cursor.fill();
+  });
+
   // handle drawing events from other clients
-  socket.on("server:draw", function (data) {
-    // only handle other clients
-    if (data.id === socket.id) return;
+  socket.on("server:draw", (data) => game.cursor.stream(data));
 
-    let currentClient = game.clients[data.id];
-
-    if (!currentClient) {
-      currentClient = game.clients[data.id] = new Pen(game, data.id);
-    }
-
-    currentClient.stream(data);
-  });
-
-  socket.on("server:undo", (data) => {
-    if (data.id === socket.id) return;
-
-    let currentClient = game.clients[data.id];
-
-    if (!currentClient) return;
-
-    currentClient.undo();
-  });
+  socket.on("server:undo", () => game.cursor.undo());
 
   // handle a reset event
   socket.on("server:reset", (data) => {
-    if (data.id === socket.id) return;
     game.history = [];
     game.clear();
   });
@@ -64,7 +49,7 @@ document.addEventListener("DOMContentLoaded", function () {
   );
 
   // download and image of the drawing in it's current state when this is clicked
-  saveButton.addEventListener("click", function (e) {
+  downloadButton.addEventListener("click", function (e) {
     // get the image from the canvas
     const image = game.canvas.toDataURL("image/png");
 
@@ -80,6 +65,16 @@ document.addEventListener("DOMContentLoaded", function () {
     document.body.removeChild(a);
   });
 
+  document.addEventListener("keydown", (e) => {
+    if (!e.ctrlKey || e.key !== "z") return;
+    game.cursor.undo();
+    game.update(true);
+  });
+
+  document.addEventListener("copy", (e) => game.copy(e));
+
+  document.addEventListener("paste", (e) => game.paste(e));
+
   // handle resizing the canvas
   window.addEventListener(
     "resize",
@@ -94,16 +89,13 @@ document.addEventListener("DOMContentLoaded", function () {
   );
 
   // undo the last line drawn
-  undoButton.addEventListener("click", () => {
-    game.cursor.undo();
-    socket.emit("client:undo", { roomId: game.roomId, steps: 1 });
-  });
+  undoButton.addEventListener("click", () => game.undo());
 
   // clear the screen
   clearButton.addEventListener("click", () => {
     game.history = [];
     game.clear();
-    socket.emit("client:reset", { roomId: game.roomId });
+    game.update(true);
   });
 
   canvas.addEventListener("mousedown", (e) => {
@@ -129,7 +121,6 @@ document.addEventListener("DOMContentLoaded", function () {
 class Game {
   constructor(canvas, socket, roomId) {
     this.roomId = roomId;
-    this.clients = {};
     this.canvas = canvas;
     this.socket = socket;
     this.context = canvas.getContext("2d");
@@ -141,6 +132,52 @@ class Game {
 
   clear() {
     this.context.clearRect(0, 0, this.width, this.height);
+  }
+
+  copy(e) {
+    e.preventDefault();
+    this.canvas.toBlob((blob) => {
+      const item = new ClipboardItem({ "image/png": blob });
+      navigator.clipboard.write([item]);
+    });
+  }
+
+  paste(e) {
+    // TODO: this should be added to history somehow
+    e.preventDefault();
+    // get item from clipboard
+    const item = e.clipboardData.items[0];
+
+    const img = new Image();
+    img.onload = () => {
+      this.context.drawImage(img, 0, 0);
+      this.update(true);
+    };
+
+    if (item.type.indexOf("image") === 0) {
+      const blob = item.getAsFile();
+      const reader = new FileReader();
+
+      reader.onload = (event) => {
+        img.src = event.target.result;
+        this.history.push({ type: "image", image: event.target.result });
+      };
+
+      reader.readAsDataURL(blob);
+    }
+  }
+
+  undo() {
+    this.cursor.undo();
+    this.update(true);
+  }
+
+  update(force = false) {
+    this.socket.emit("client:update", {
+      history: this.history,
+      roomId: this.roomId,
+      force,
+    });
   }
 }
 
@@ -172,15 +209,13 @@ class Pen {
       if (!this.points.length) return;
 
       this.game.history.push({
+        type: "draw",
         points: this.points,
         color: this.color,
         width: this.width,
       });
 
-      this.game.socket.emit("history:update", {
-        history: this.game.history,
-        roomId: this.game.roomId,
-      });
+      this.game.update();
     }
   }
 
@@ -215,6 +250,7 @@ class Pen {
     if (!data.isDown) {
       if (this.points.length) {
         this.game.history.push({
+          type: "draw",
           points: this.points,
           color: this.color,
           width: this.width,
@@ -254,19 +290,29 @@ class Pen {
   fill() {
     this.game.clear();
     // redraw everything
-    this.game.history.forEach(({ points: paths, color, width }) => {
-      this.game.context.strokeStyle = color;
-      this.game.context.lineWidth = width;
-      this.game.context.lineCap = this.lineCap;
-      let currentPath = paths[0];
+    this.game.history.forEach((event) => {
+      const { type, points: paths, color, width } = event;
+      if (type === "draw") {
+        this.game.context.strokeStyle = color;
+        this.game.context.lineWidth = width;
+        this.game.context.lineCap = this.lineCap;
+        let currentPath = paths[0];
 
-      for (let i = 1; i < paths.length; i++) {
-        this.game.context.beginPath();
-        this.game.context.moveTo(currentPath.x, currentPath.y);
-        currentPath = paths[i];
-        this.game.context.lineTo(currentPath.x, currentPath.y);
-        this.game.context.stroke();
-        this.game.context.closePath();
+        for (let i = 1; i < paths.length; i++) {
+          this.game.context.beginPath();
+          this.game.context.moveTo(currentPath.x, currentPath.y);
+          currentPath = paths[i];
+          this.game.context.lineTo(currentPath.x, currentPath.y);
+          this.game.context.stroke();
+          this.game.context.closePath();
+        }
+      } else if (type === "image") {
+        const img = new Image();
+        img.src = event.image;
+
+        img.onload = () => {
+          this.game.context.drawImage(img, 0, 0);
+        };
       }
     });
   }
