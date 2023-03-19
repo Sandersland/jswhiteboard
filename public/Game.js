@@ -16,6 +16,17 @@ export class DrawEvent extends CanvasEvent {
   }
 }
 
+export class DrawRectangleEvent extends CanvasEvent {
+  constructor(color, startX, startY, endX, endY) {
+    super(EventType.DRAW_RECTANGLE);
+    this.color = color;
+    this.startX = startX;
+    this.startY = startY;
+    this.endX = endX;
+    this.endY = endY;
+  }
+}
+
 export class ImageEvent extends CanvasEvent {
   constructor(image) {
     super(EventType.IMAGE);
@@ -41,6 +52,8 @@ class EventCache {
   }
 
   add(event) {
+    if (!event) return;
+
     if (this.position <= this.events.length) {
       this.events = this.events.slice(0, this.position);
     }
@@ -74,6 +87,11 @@ export default class Game {
     this.cursor = new Pen(this);
     this.history = new EventCache();
     this.clients = {};
+    this.toolId = ""; // default to Draw for now
+  }
+
+  selectTool(toolId) {
+    this.toolId = toolId;
   }
 
   reset() {
@@ -93,6 +111,15 @@ export default class Game {
         break;
       case EventType.RESET:
         event = new ResetEvent();
+        break;
+      case EventType.DRAW_RECTANGLE:
+        event = new DrawRectangleEvent(
+          data.color,
+          data.startX,
+          data.startY,
+          data.endX,
+          data.endY
+        );
         break;
     }
     this.history.add(event);
@@ -181,8 +208,9 @@ export default class Game {
     for (let i = 0; i < this.history.events.length; i++) {
       if (i >= this.history.position) continue;
       const event = this.history.events[i];
-      const { type, points: paths, color, width } = event;
-      if (type === EventType.DRAW) {
+
+      if (event.type === EventType.DRAW) {
+        const { points: paths, color, width } = event;
         this.context.strokeStyle = color;
         this.context.lineWidth = width;
         this.context.lineCap = this.cursor.lineCap;
@@ -196,11 +224,15 @@ export default class Game {
           this.context.stroke();
           this.context.closePath();
         }
-      } else if (type === EventType.IMAGE) {
+      } else if (event.type === EventType.IMAGE) {
         const img = await loadImage(event.image);
         this.context.drawImage(img, 0, 0);
-      } else if (type === EventType.RESET) {
+      } else if (event.type === EventType.RESET) {
         this.context.clearRect(0, 0, this.width, this.height);
+      } else if (event.type === EventType.DRAW_RECTANGLE) {
+        const { startX, startY, endX, endY, color } = event;
+        this.context.fillStyle = color;
+        this.context.fillRect(startX, startY, endX, endY);
       }
     }
   }

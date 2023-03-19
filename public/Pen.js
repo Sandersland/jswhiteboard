@@ -1,5 +1,10 @@
 import { EventType } from "./lib.js";
 
+export const ToolType = {
+  DRAW: "1",
+  RECTANGLE: "2",
+};
+
 export default class Pen {
   constructor(game) {
     // keep track of game object to append events onto the history array
@@ -22,12 +27,25 @@ export default class Pen {
     this.width = width;
   }
 
-  pickUp() {
+  pickUp(x, y) {
     if (this.isDown) {
       this.isDown = false;
-      if (!this.points.length) return;
-      this.game.append(EventType.DRAW, this);
-      this.game.update();
+
+      if (this.game.toolId == ToolType.DRAW) {
+        if (!this.points.length) return;
+        this.game.append(EventType.DRAW, this);
+        this.game.update();
+      } else if (this.game.toolId == ToolType.RECTANGLE) {
+        this.drawRectangle(x, y);
+        this.game.append(EventType.DRAW_RECTANGLE, {
+          color: this.color,
+          startX: this.x,
+          startY: this.y,
+          endX: x - this.x,
+          endY: y - this.y,
+        });
+        this.game.update(true);
+      }
     }
   }
 
@@ -51,5 +69,14 @@ export default class Pen {
     this.points.push({ x: this.x, y: this.y });
     this.game.context.lineTo(this.x, this.y);
     this.game.context.stroke();
+  }
+
+  drawRectangle(x, y) {
+    if (!this.isDown) return;
+    this.game.fill();
+    const endX = x - this.x;
+    const endY = y - this.y;
+    this.game.context.fillStyle = this.color;
+    this.game.context.fillRect(this.x, this.y, endX, endY);
   }
 }

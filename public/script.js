@@ -1,4 +1,5 @@
 import Game from "./Game.js";
+import { ToolType } from "./Pen.js";
 
 document.addEventListener("DOMContentLoaded", function () {
   const CANVAS_MARGIN = 20;
@@ -10,6 +11,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const downloadButton = document.getElementById("download");
   const undoButton = document.getElementById("undo");
   const clearButton = document.getElementById("reset");
+  const toolSelect = document.getElementById("tool-select");
 
   const socket = io();
 
@@ -26,6 +28,11 @@ document.addEventListener("DOMContentLoaded", function () {
   const width = localStorage.getItem("width") || penWidth.value;
   game.cursor.setWidth(width);
   penWidth.value = width;
+
+  // set the initial tool selection
+  const toolId = localStorage.getItem("tool") || toolSelect.value;
+  game.selectTool(toolId);
+  toolSelect.value = toolId;
 
   // send an event to join a room when first connecting
   socket.emit("room:join", { roomId }, (data) => {
@@ -57,6 +64,11 @@ document.addEventListener("DOMContentLoaded", function () {
   penColor.addEventListener("change", (e) => {
     localStorage.setItem("color", e.target.value);
     game.cursor.setColor(e.target.value);
+  });
+
+  toolSelect.addEventListener("change", (e) => {
+    localStorage.setItem("tool", e.target.value);
+    game.selectTool(e.target.value);
   });
 
   // download and image of the drawing in it's current state when this is clicked
@@ -128,19 +140,21 @@ document.addEventListener("DOMContentLoaded", function () {
     game.update(true);
   });
 
+  function getMouseCoordinates(canvas, mouseEvent) {
+    const x = mouseEvent.offsetX - canvas.offsetLeft;
+    const y = mouseEvent.offsetY - canvas.offsetTop;
+    return [x, y];
+  }
+
   canvas.addEventListener("mousedown", (e) => {
-    // account for the canvas offsets
-    const x = e.offsetX - game.canvas.offsetLeft;
-    const y = e.offsetY - game.canvas.offsetTop;
+    const [x, y] = getMouseCoordinates(game.canvas, e);
 
     // update cursor
     game.cursor.putDown(x, y);
   });
 
-  canvas.addEventListener("mousemove", (e) => {
-    // account for the canvas offsets
-    const x = e.offsetX - game.canvas.offsetLeft;
-    const y = e.offsetY - game.canvas.offsetTop;
+  const handleDraw = (e) => {
+    const [x, y] = getMouseCoordinates(game.canvas, e);
 
     // draw on the canvas
     game.cursor.draw(x, y);
@@ -154,8 +168,33 @@ document.addEventListener("DOMContentLoaded", function () {
       isDown: game.cursor.isDown,
       roomId,
     });
+  };
+
+  const handleDrawSquare = (e) => {
+    const [x, y] = getMouseCoordinates(game.canvas, e);
+
+    // draw square on canvas
+    game.cursor.drawRectangle(x, y);
+  };
+
+  canvas.addEventListener("mousemove", (e) => {
+    switch (game.toolId) {
+      case ToolType.DRAW:
+        handleDraw(e);
+        break;
+      case ToolType.RECTANGLE:
+        handleDrawSquare(e);
+        break;
+    }
   });
 
-  canvas.addEventListener("mouseup", () => game.cursor.pickUp());
-  canvas.addEventListener("mouseout", () => game.cursor.pickUp());
+  canvas.addEventListener("mouseup", (e) => {
+    const [x, y] = getMouseCoordinates(game.canvas, e);
+    game.cursor.pickUp(x, y);
+  });
+
+  canvas.addEventListener("mouseout", (e) => {
+    const [x, y] = getMouseCoordinates(game.canvas, e);
+    game.cursor.pickUp(x, y);
+  });
 });
