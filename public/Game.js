@@ -1,5 +1,11 @@
 import Pen from "./Pen.js";
 
+const EventType = {
+  DRAW: "draw",
+  IMAGE: "image",
+  RESET: "reset",
+};
+
 class CanvasEvent {
   constructor(type) {
     this.type = type;
@@ -8,7 +14,7 @@ class CanvasEvent {
 
 export class DrawEvent extends CanvasEvent {
   constructor(color, width, points) {
-    super("draw");
+    super(EventType.DRAW);
     this.color = color;
     this.width = width;
     this.points = points;
@@ -17,14 +23,14 @@ export class DrawEvent extends CanvasEvent {
 
 export class ImageEvent extends CanvasEvent {
   constructor(image) {
-    super("image");
+    super(EventType.IMAGE);
     this.image = image;
   }
 }
 
 export class ResetEvent extends CanvasEvent {
   constructor() {
-    super("reset");
+    super(EventType.RESET);
   }
 }
 
@@ -76,7 +82,7 @@ export default class Game {
   }
 
   reset() {
-    this.append("reset");
+    this.append(EventType.RESET);
     this.clear();
   }
 
@@ -84,13 +90,13 @@ export default class Game {
   append(type, data) {
     let event;
     switch (type) {
-      case "draw":
+      case EventType.DRAW:
         event = new DrawEvent(data.color, data.width, data.points);
         break;
-      case "image":
+      case EventType.IMAGE:
         event = new ImageEvent(data);
         break;
-      case "reset":
+      case EventType.RESET:
         event = new ResetEvent();
         break;
     }
@@ -134,7 +140,7 @@ export default class Game {
         img.src = dataUrl;
 
         // add the image event to the history array
-        this.append("image", dataUrl);
+        this.append(EventType.IMAGE, dataUrl);
       };
 
       reader.readAsDataURL(blob);
@@ -162,7 +168,7 @@ export default class Game {
 
     if (!data.isDown) {
       if (clientCursor.points.length) {
-        this.append("draw", clientCursor);
+        this.append(EventType.DRAW, clientCursor);
         clientCursor.points = [];
       }
 
@@ -181,7 +187,7 @@ export default class Game {
       if (i >= this.history.position) continue;
       const event = this.history.events[i];
       const { type, points: paths, color, width } = event;
-      if (type === "draw") {
+      if (type === EventType.DRAW) {
         this.context.strokeStyle = color;
         this.context.lineWidth = width;
         this.context.lineCap = this.cursor.lineCap;
@@ -195,10 +201,10 @@ export default class Game {
           this.context.stroke();
           this.context.closePath();
         }
-      } else if (type === "image") {
+      } else if (type === EventType.IMAGE) {
         const img = await loadImage(event.image);
         this.context.drawImage(img, 0, 0);
-      } else if (type === "reset") {
+      } else if (type === EventType.RESET) {
         this.context.clearRect(0, 0, this.width, this.height);
       }
     }
