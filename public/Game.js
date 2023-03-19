@@ -1,10 +1,5 @@
 import Pen from "./Pen.js";
-
-const EventType = {
-  DRAW: "draw",
-  IMAGE: "image",
-  RESET: "reset",
-};
+import { EventType } from "./lib.js";
 
 class CanvasEvent {
   constructor(type) {

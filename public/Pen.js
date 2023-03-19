@@ -1,3 +1,5 @@
+import { EventType } from "./lib.js";
+
 export default class Pen {
   constructor(game) {
     // keep track of game object to append events onto the history array
@@ -24,10 +26,7 @@ export default class Pen {
     if (this.isDown) {
       this.isDown = false;
       if (!this.points.length) return;
-      this.game.append("draw", this);
-      // this.game.history.push(
-      //   new DrawEvent(this.color, this.width, this.points)
-      // );
+      this.game.append(EventType.DRAW, this);
       this.game.update();
     }
   }
