@@ -88,6 +88,7 @@ export default class Game {
     this.history = new EventCache();
     this.clients = {};
     this.toolId = ""; // default to Draw for now
+    this.imgCache = {};
   }
 
   selectTool(toolId) {
@@ -146,6 +147,9 @@ export default class Game {
     img.onload = () => {
       // draw the image on the canvas
       this.context.drawImage(img, 0, 0);
+
+      // cache the image to prevent flickering when the canvas is re-rendered
+      this.imgCache[img.src] = img;
 
       // draw the image on other client's canvas
       this.update(true);
@@ -225,7 +229,16 @@ export default class Game {
           this.context.closePath();
         }
       } else if (event.type === EventType.IMAGE) {
-        const img = await loadImage(event.image);
+        // check to see if this image has been cached
+        let img = this.imgCache[event.image];
+
+        if (!img) {
+          // if the image hasn't been cached, load it then cache it
+          img = await loadImage(event.image);
+          this.imgCache[event.image] = img;
+        }
+
+        // draw the image
         this.context.drawImage(img, 0, 0);
       } else if (event.type === EventType.RESET) {
         this.context.clearRect(0, 0, this.width, this.height);
