@@ -174,11 +174,12 @@ export default class Game {
     clientCursor.draw(data.x, data.y);
   }
 
-  fill() {
+  async fill() {
     this.clear();
     // redraw everything
-    this.history.events.forEach((event, i) => {
-      if (i >= this.history.position) return;
+    for (let i = 0; i < this.history.events.length; i++) {
+      if (i >= this.history.position) continue;
+      const event = this.history.events[i];
       const { type, points: paths, color, width } = event;
       if (type === "draw") {
         this.context.strokeStyle = color;
@@ -195,16 +196,12 @@ export default class Game {
           this.context.closePath();
         }
       } else if (type === "image") {
-        const img = new Image();
-        img.src = event.image;
-
-        img.onload = () => {
-          this.context.drawImage(img, 0, 0);
-        };
+        const img = await loadImage(event.image);
+        this.context.drawImage(img, 0, 0);
       } else if (type === "reset") {
         this.context.clearRect(0, 0, this.width, this.height);
       }
-    });
+    }
   }
 
   undo() {
@@ -216,4 +213,12 @@ export default class Game {
     this.history.redo();
     this.fill();
   }
+}
+
+async function loadImage(url, elem = new Image()) {
+  return new Promise((resolve, reject) => {
+    elem.onload = () => resolve(elem);
+    elem.onerror = reject;
+    elem.src = url;
+  });
 }
