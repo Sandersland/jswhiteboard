@@ -15,34 +15,40 @@ const PORT = process.env.PORT || 3000;
 // keep track of each room's history here so that it can be sent to the client as needed
 const rooms = {};
 
-// make sure that the roomId parameter exists as it is what identifies the drawing session
-app.use((req, res, next) => {
-  if (req.path === "/") {
-    // only handle root path
-    let roomId = req.query.roomId;
-
-    if (!roomId) {
-      roomId = crypto.randomUUID();
-      rooms[roomId] = {
-        history: {
-          position: 0,
-          events: [],
-        },
-      };
-      return res.redirect(url.parse(req.url).pathname + `?roomId=${roomId}`);
-    }
-
-    if (roomId && !rooms[roomId]) {
-      return res.redirect(url.parse(req.url).pathname);
-    }
-  }
-
-  next();
-});
+// the action happens on the /draw url
+app.get("/", (_, res) => res.redirect("/draw"));
 
 // serve the public files to the public
 // the root path will automatically use index.html
 app.use(express.static(path.join(__dirname, "public")));
+
+app.get("/draw", (req, res) => {
+  // only handle root path
+  let roomId = req.query.roomId;
+
+  // make sure that the roomId parameter exists as it is what identifies the drawing session
+  if (!roomId) {
+    roomId = crypto.randomUUID();
+    rooms[roomId] = {
+      history: {
+        position: 0,
+        events: [],
+      },
+    };
+    return res.redirect(url.parse(req.url).pathname + `?roomId=${roomId}`);
+  }
+
+  if (roomId && !rooms[roomId]) {
+    return res.redirect(url.parse(req.url).pathname);
+  }
+
+  // serve index.html
+  const options = {
+    root: path.join(__dirname, "public"),
+  };
+
+  res.sendFile("index.html", options);
+});
 
 io.on("connection", (socket) => {
   // TODO: clean up unused room history

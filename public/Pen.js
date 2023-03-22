@@ -3,6 +3,7 @@ import { EventType } from "./lib.js";
 export const ToolType = {
   DRAW: "1",
   RECTANGLE: "2",
+  COLOR_PICKER: "3",
 };
 
 export default class Pen {
@@ -79,4 +80,23 @@ export default class Pen {
     this.game.context.fillStyle = this.color;
     this.game.context.fillRect(this.x, this.y, endX, endY);
   }
+
+  pickColor(x, y) {
+    if (!this.isDown) return;
+    const [r, g, b, a] = this.game.context.getImageData(x, y, 1, 1).data;
+
+    const color = "#" + [r, g, b].map(componentToHex).join("");
+
+    // TODO: should I do anything with this?
+    const alpha = componentToHex(a) / 255;
+
+    this.setColor(color);
+
+    return color;
+  }
+}
+
+function componentToHex(c) {
+  var hex = c.toString(16);
+  return hex.length == 1 ? "0" + hex : hex;
 }

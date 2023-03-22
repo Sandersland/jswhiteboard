@@ -151,6 +151,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // update cursor
     game.cursor.putDown(x, y);
+
+    // handle color being picked
+    if (game.toolId === ToolType.COLOR_PICKER) {
+      const color = game.cursor.pickColor(x, y);
+
+      penColor.value = color;
+      localStorage.setItem("color", penColor.value);
+    }
   });
 
   const handleDraw = (e) => {

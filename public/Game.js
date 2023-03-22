@@ -81,13 +81,15 @@ export default class Game {
     this.canvas = canvas;
     this.roomId = roomId;
     this.socket = socket;
-    this.context = canvas.getContext("2d");
+    this.context = canvas.getContext("2d", {
+      willReadFrequently: true,
+    });
     this.width = canvas.width;
     this.height = canvas.height;
     this.cursor = new Pen(this);
     this.history = new EventCache();
     this.clients = {};
-    this.toolId = ""; // default to Draw for now
+    this.toolId = "1"; // default to Draw for now
     this.imgCache = {};
   }
 
