@@ -4,16 +4,29 @@ const crypto = require("crypto");
 const url = require("url");
 
 const express = require("express");
-const { Server } = require("socket.io");
+const helmet = require("helmet");
+const cors = require("cors");
+const { Server: SocketServer } = require("socket.io");
+const { MongoClient } = require("mongodb");
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+// use .env files for settings and credentials
+require("dotenv").config();
 
+// use the port set in the .env file if provided, otherwise default to port 3000
 const PORT = process.env.PORT || 3000;
 
+// initialize express server and security middlewares
+const app = express();
+const server = http.createServer(app);
+app.use(cors());
+app.use(helmet());
+
+// initialize a socket.io server
+const io = new SocketServer(server);
+const mongoClient = new MongoClient(process.env.MONGO_URI);
+
 // keep track of each room's history here so that it can be sent to the client as needed
-const rooms = {};
+let historyCollection;
 
 // the action happens on the /draw url
 app.get("/", (_, res) => res.redirect("/draw"));
@@ -22,23 +35,34 @@ app.get("/", (_, res) => res.redirect("/draw"));
 // the root path will automatically use index.html
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/draw", (req, res) => {
-  // only handle root path
+// serve the whiteboard endpoint
+app.get("/draw", async (req, res) => {
   let roomId = req.query.roomId;
+  let result;
 
   // make sure that the roomId parameter exists as it is what identifies the drawing session
   if (!roomId) {
+    // generate a uuid that will be used as the unique room identifier
     roomId = crypto.randomUUID();
-    rooms[roomId] = {
-      history: {
-        position: 0,
-        events: [],
-      },
-    };
+
+    // insert an event record
+    result = await historyCollection.insertOne({
+      _id: roomId,
+      position: 0,
+      events: [],
+    });
+
+    // redirect with the newly generated roomId to be used in the client
     return res.redirect(url.parse(req.url).pathname + `?roomId=${roomId}`);
   }
 
-  if (roomId && !rooms[roomId]) {
+  // handle the case where the roomId was provided but doesn't exist or isn't valid
+  if (roomId && !result) {
+    result = await historyCollection.findOne({ _id: req.query.roomId });
+
+    if (result) return; // we're okay to proceed
+
+    // otherwise we strip the query params and redirect
     return res.redirect(url.parse(req.url).pathname);
   }
 
@@ -50,31 +74,51 @@ app.get("/draw", (req, res) => {
   res.sendFile("index.html", options);
 });
 
+// socket io events
 io.on("connection", (socket) => {
-  // TODO: clean up unused room history
-  socket.on("disconnect", () => {});
+  // find the room that is joined and respond with the room history
+  socket.on("room:join", async (data, callback) => {
+    let result = await historyCollection.findOne({ _id: data.roomId });
 
-  socket.on("room:join", (data, callback) => {
     socket.join(data.roomId);
-    const history = rooms[data.roomId].history;
-    callback({ history });
+    socket.roomId = data.roomId;
+    callback({ history: result });
   });
 
-  socket.on("client:update", (data) => {
-    const currentRoom = rooms[data.roomId];
-    if (!currentRoom) return; // don't crash the server
+  // update the database with the current history
+  socket.on("client:update", async (data) => {
+    await historyCollection.updateOne(
+      { _id: socket.roomId },
+      {
+        $set: {
+          events: data.history.events,
+          position: data.history.position,
+        },
+      }
+    );
 
-    currentRoom.history = data.history;
-
+    // if the 'force' parameter is true then forward this event to other clients
     if (!data.force) return;
     socket.to(data.roomId).emit("server:update", data);
   });
 
+  // handle streaming draw events
   socket.on("client:draw", (data) => {
     socket.to(data.roomId).emit("server:draw", data);
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Listening on port ${PORT}`);
+// start the server and listen for requests
+server.listen(PORT, async () => {
+  try {
+    // attempt to connect to mongodb
+    await mongoClient.connect();
+
+    // set a global reference to the history collection
+    historyCollection = mongoClient.db("jswhiteboard").collection("history");
+
+    console.log("Listening on port %s...", server.address().port);
+  } catch (e) {
+    console.error(e);
+  }
 });
