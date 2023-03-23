@@ -4,13 +4,20 @@
   box-sizing: border-box;
 }
 
-#canvas {
-  border: 1px solid black;
-}
-
 .container {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+}
+
+.resizeable {
+  border: solid 1px black;
+  resize: both;
+  overflow: hidden;
+}
+
+#canvas-container {
+  width: 800px;
+  height: 650px;
 }
