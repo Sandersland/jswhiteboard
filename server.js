@@ -59,11 +59,10 @@ app.get("/draw", async (req, res) => {
   // handle the case where the roomId was provided but doesn't exist or isn't valid
   if (roomId && !result) {
     result = await historyCollection.findOne({ _id: req.query.roomId });
-
-    if (result) return; // we're okay to proceed
-
-    // otherwise we strip the query params and redirect
-    return res.redirect(url.parse(req.url).pathname);
+    // drop the roomId and redirect if the room specified doesn't exist
+    if (!result) {
+      return res.redirect(url.parse(req.url).pathname);
+    }
   }
 
   // serve index.html
