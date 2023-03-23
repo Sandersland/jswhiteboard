@@ -12,6 +12,8 @@ const { MongoClient } = require("mongodb");
 // use .env files for settings and credentials
 require("dotenv").config();
 
+const debounce = require("./debounce");
+
 // use the port set in the .env file if provided, otherwise default to port 3000
 const PORT = process.env.PORT || 3000;
 
@@ -80,30 +82,35 @@ io.on("connection", (socket) => {
     let result = await historyCollection.findOne({ _id: data.roomId });
 
     socket.join(data.roomId);
+    // set the room Id to be used for other events
     socket.roomId = data.roomId;
     callback({ history: result });
   });
 
   // update the database with the current history
-  socket.on("client:update", async (data) => {
-    await historyCollection.updateOne(
-      { _id: socket.roomId },
-      {
-        $set: {
-          events: data.history.events,
-          position: data.history.position,
-        },
-      }
-    );
+  socket.on(
+    "client:update",
+    // debounce updating mongodb to reduce number of updates
+    debounce(async (data) => {
+      await historyCollection.updateOne(
+        { _id: socket.roomId },
+        {
+          $set: {
+            events: data.history.events,
+            position: data.history.position,
+          },
+        }
+      );
 
-    // if the 'force' parameter is true then forward this event to other clients
-    if (!data.force) return;
-    socket.to(data.roomId).emit("server:update", data);
-  });
+      // if the 'force' parameter is true then forward this event to other clients
+      if (!data.force) return;
+      socket.to(socket.roomId).emit("server:update", data);
+    })
+  );
 
   // handle streaming draw events
   socket.on("client:draw", (data) => {
-    socket.to(data.roomId).emit("server:draw", data);
+    socket.to(socket.roomId).emit("server:draw", data);
   });
 });
 

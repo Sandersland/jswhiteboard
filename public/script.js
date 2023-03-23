@@ -173,7 +173,6 @@ document.addEventListener("DOMContentLoaded", function () {
       color: game.cursor.color,
       width: game.cursor.width,
       isDown: game.cursor.isDown,
-      roomId,
     });
   };
 
