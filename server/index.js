@@ -39,7 +39,9 @@ app.get("/", (_, res) => res.redirect("/draw"));
 
 // serve the public files to the public
 // the root path will automatically use index.html
-app.use(express.static(path.join(__dirname, "public")));
+const staticDir = path.join(__dirname, "..", "public");
+
+app.use(express.static(staticDir));
 
 // serve the whiteboard endpoint
 app.get("/draw", async (req, res) => {
@@ -72,11 +74,7 @@ app.get("/draw", async (req, res) => {
   }
 
   // serve index.html
-  const options = {
-    root: path.join(__dirname, "public"),
-  };
-
-  res.sendFile("index.html", options);
+  res.sendFile("index.html", { root: staticDir });
 });
 
 // socket io events

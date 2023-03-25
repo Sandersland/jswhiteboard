@@ -6,7 +6,7 @@
   },
   "version": "0.0.1",
   "description": "",
-  "main": "server.js",
+  "main": "server/index.js",
   "scripts": {
     "start": "node .",
     "dev": "nodemon ."
