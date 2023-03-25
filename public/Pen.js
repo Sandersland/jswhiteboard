@@ -1,5 +1,6 @@
 import { EventType } from "./lib.js";
 
+// TODO: this shouldn't be kept here. There should be a seperate interface that manages the tool options
 export const ToolType = {
   DRAW: "1",
   RECTANGLE: "2",
@@ -32,6 +33,8 @@ export default class Pen {
     if (this.isDown) {
       this.isDown = false;
 
+      // TODO: the pen tool shouldn't care about the tool that's currently selected.
+      // move this logic elsewhere
       if (this.game.toolId == ToolType.DRAW) {
         if (!this.points.length) return;
         this.game.append(EventType.DRAW, this);
@@ -72,6 +75,7 @@ export default class Pen {
     this.game.context.stroke();
   }
 
+  // TODO: there should be a seperate interface for drawing rectangles and other shapes.
   drawRectangle(x, y) {
     if (!this.isDown) return;
     this.game.fill();
@@ -81,13 +85,14 @@ export default class Pen {
     this.game.context.fillRect(this.x, this.y, endX, endY);
   }
 
+  // TODO: there should be a seperate interface for the color picker tool
   pickColor(x, y) {
     if (!this.isDown) return;
     const [r, g, b, a] = this.game.context.getImageData(x, y, 1, 1).data;
 
     const color = "#" + [r, g, b].map(componentToHex).join("");
 
-    // TODO: should I do anything with this?
+    // TODO: implement alpha so that we can draw slightly transparent images
     const alpha = componentToHex(a) / 255;
 
     this.setColor(color);

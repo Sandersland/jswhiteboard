@@ -3,11 +3,21 @@ import { ToolType } from "./Pen.js";
 
 document.addEventListener("DOMContentLoaded", function () {
   const canvasContainer = document.getElementById("canvas-container");
+
+  // set the initial canvas container's width and height
+  canvasContainer.style.width =
+    localStorage.getItem("canvas-width") || canvasContainer.style.width;
+  canvasContainer.style.height =
+    localStorage.getItem("canvas-height") || canvasContainer.style.height;
+
   const canvas = document.getElementById("canvas");
+
+  // default the size of the canvas to take the entire size of the container
   canvas.height = canvasContainer.height;
   canvas.width = canvasContainer.width;
-  const penColorSelect = document.querySelector('input[name="penColor"]');
-  const penWidthSelect = document.querySelector('input[name="penWidth"]');
+
+  const colorSelect = document.querySelector('input[name="color"]');
+  const widthSelect = document.querySelector('input[name="cursor-width"]');
   const downloadButton = document.getElementById("download");
   const undoButton = document.getElementById("undo");
   const clearButton = document.getElementById("reset");
@@ -24,6 +34,10 @@ document.addEventListener("DOMContentLoaded", function () {
   const resizeObserver = new ResizeObserver((entries) => {
     const entry = entries[0];
     const { width, height } = entry.contentRect;
+
+    localStorage.setItem("canvas-width", width + "px");
+    localStorage.setItem("canvas-height", height + "px");
+
     canvas.height = game.height = height;
     canvas.width = game.width = width;
     game.fill();
@@ -32,14 +46,14 @@ document.addEventListener("DOMContentLoaded", function () {
   resizeObserver.observe(canvasContainer);
 
   // set the initial cursor color
-  const color = localStorage.getItem("color") || penColorSelect.value;
+  const color = localStorage.getItem("color") || colorSelect.value;
   game.cursor.setColor(color);
-  penColorSelect.value = color;
+  colorSelect.value = color;
 
   // set the initial cursor width
-  const penWidth = localStorage.getItem("width") || penWidthSelect.value;
+  const penWidth = localStorage.getItem("width") || widthSelect.value;
   game.cursor.setWidth(penWidth);
-  penWidthSelect.value = penWidth;
+  widthSelect.value = penWidth;
 
   // set the initial tool selection
   const toolId = localStorage.getItem("tool") || toolSelect.value;
@@ -68,12 +82,12 @@ document.addEventListener("DOMContentLoaded", function () {
     game.reset();
   });
 
-  penWidthSelect.addEventListener("change", (e) => {
+  widthSelect.addEventListener("change", (e) => {
     localStorage.setItem("width", e.target.value);
     game.cursor.setWidth(e.target.value);
   });
 
-  penColorSelect.addEventListener("change", (e) => {
+  colorSelect.addEventListener("change", (e) => {
     localStorage.setItem("color", e.target.value);
     game.cursor.setColor(e.target.value);
   });
@@ -155,8 +169,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (game.toolId === ToolType.COLOR_PICKER) {
       const color = game.cursor.pickColor(x, y);
 
-      penColorSelect.value = color;
-      localStorage.setItem("color", penColorSelect.value);
+      colorSelect.value = color;
+      localStorage.setItem("color", colorSelect.value);
     }
   });
 
