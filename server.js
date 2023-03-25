@@ -7,7 +7,7 @@ const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
 const { Server: SocketServer } = require("socket.io");
-const { MongoClient } = require("mongodb");
+const { MongoClient, ServerApiVersion } = require("mongodb");
 
 // use .env files for settings and credentials
 require("dotenv").config();
@@ -25,7 +25,11 @@ app.use(helmet());
 
 // initialize a socket.io server
 const io = new SocketServer(server);
-const mongoClient = new MongoClient(process.env.MONGO_URI);
+const mongoClient = new MongoClient(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverApi: ServerApiVersion.v1,
+});
 
 // keep track of each room's history here so that it can be sent to the client as needed
 let historyCollection;
@@ -114,17 +118,18 @@ io.on("connection", (socket) => {
   });
 });
 
-// start the server and listen for requests
-server.listen(PORT, async () => {
-  try {
-    // attempt to connect to mongodb
-    await mongoClient.connect();
-
-    // set a global reference to the history collection
-    historyCollection = mongoClient.db("jswhiteboard").collection("history");
-
+app.on("ready", () => {
+  // start the server and listen for requests
+  server.listen(PORT, () => {
     console.log("Listening on port %s...", server.address().port);
-  } catch (e) {
-    console.error(e);
-  }
+  });
 });
+
+(async () => {
+  // attempt to connect to mongodb
+  await mongoClient.connect();
+  // set a global reference to the history collection
+  historyCollection = mongoClient.db("jswhiteboard").collection("history");
+  // only listen for network requests after other setup is completed
+  app.emit("ready");
+})();
