@@ -21,3 +21,7 @@
   width: 800px;
   height: 650px;
 }
+
+#canvas {
+  cursor: crosshair;
+}

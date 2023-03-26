@@ -62,7 +62,11 @@ export default class Pen {
   }
 
   draw(x, y) {
-    if (!this.isDown) return;
+    if (!this.isDown) {
+      this.x = x;
+      this.y = y;
+      return;
+    }
     this.game.context.lineCap = this.lineCap;
     this.game.context.strokeStyle = this.color;
     this.game.context.lineWidth = this.width;
